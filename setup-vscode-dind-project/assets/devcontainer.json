@@ -1,0 +1,43 @@
+// Uses an independent Docker daemon inside the Dev Container.
+// Feature documentation: https://github.com/devcontainers/features/tree/main/src/docker-in-docker
+{
+	"name": "Docker-in-Docker AI Development",
+	"image": "mcr.microsoft.com/devcontainers/base:bookworm",
+
+	"features": {
+		"ghcr.io/devcontainers/features/docker-in-docker:3": {
+			"version": "latest",
+			"moby": true,
+			"dockerDashComposeVersion": "v2",
+			"installDockerBuildx": true
+		}
+	},
+
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"openai.chatgpt",
+				"anthropic.claude-code"
+			]
+		}
+	},
+
+	"forwardPorts": [1455],
+
+	"portsAttributes": {
+		"1455": {
+			"label": "Codex authentication callback",
+			"onAutoForward": "silent",
+			"requireLocalPort": true
+		}
+	},
+
+	// Persist Codex and Claude Code sessions and authentication in ignored project-local directories.
+	"mounts": [
+		"source=${localWorkspaceFolder}/.codex-home,target=/home/vscode/.codex,type=bind",
+		"source=${localWorkspaceFolder}/.claude-home,target=/home/vscode/.claude,type=bind"
+	],
+
+	"remoteUser": "vscode",
+	"shutdownAction": "stopContainer"
+}

@@ -1,0 +1,9 @@
+/.codex-home/
+/.claude-home/
+/*
+!/.devcontainer/
+!/.devcontainer/**
+!/.gitignore
+!AGENTS.md
+!/.vscode/
+!/code
