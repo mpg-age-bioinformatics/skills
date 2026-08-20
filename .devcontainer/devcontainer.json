@@ -1,0 +1,36 @@
+{
+  "name": "R 4.4.2 Development",
+  "image": "ghcr.io/rocker-org/devcontainer/r-ver:4.4.2",
+  "features": {
+    "ghcr.io/rocker-org/devcontainer-features/r-packages:1": {
+      "packages": "languageserver,httpgd,renv,rmarkdown",
+      "installSystemRequirements": true
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": ["REditorSupport.r", "RDebugger.r-debugger", "quarto.quarto", "openai.chatgpt"],
+      "settings": {
+        "r.alwaysUseActiveTerminal": true,
+        "r.bracketedPaste": true,
+        "r.plot.useHttpgd": true,
+        "r.sessionWatcher": true,
+        "workbench.panel.defaultLocation": "bottom",
+        "workbench.sideBar.location": "right",
+        "workbench.startupEditor": "none",
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
+    }
+  },
+  "forwardPorts": [1455],
+  "portsAttributes": {
+    "1455": {
+      "label": "Codex authentication callback",
+      "onAutoForward": "silent",
+      "requireLocalPort": true
+    }
+  },
+  "mounts": ["source=${localWorkspaceFolder}/.codex-home,target=/home/vscode/.codex,type=bind"],
+  "remoteUser": "vscode",
+  "shutdownAction": "stopContainer"
+}
