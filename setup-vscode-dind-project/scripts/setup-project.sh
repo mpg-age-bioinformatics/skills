@@ -39,10 +39,14 @@ if [[ ! -e AGENTS.md ]]; then
 	cp "$skill_dir/assets/AGENTS.md" AGENTS.md
 fi
 
+if [[ ! -e .instructions.md ]]; then
+	cp "$skill_dir/assets/.instructions.md" .instructions.md
+fi
+
 git init
 
 if git rev-parse --verify HEAD >/dev/null 2>&1; then
-	git add -A -- .devcontainer .gitignore AGENTS.md
+	git add -A -- .devcontainer .gitignore AGENTS.md .instructions.md
 	if git diff --cached --quiet; then
 		echo "Repository setup is already committed."
 	else

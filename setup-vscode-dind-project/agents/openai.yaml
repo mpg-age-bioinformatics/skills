@@ -1,4 +1,4 @@
 interface:
   display_name: "Set Up DinD Project"
   short_description: "Create persistent Codex/Claude DinD workspace"
-  default_prompt: "Use $setup-vscode-dind-project to add the DinD Dev Container, project-local Codex and Claude Code persistence, code/data layout, and root AGENTS.md execution policy."
+  default_prompt: "Use $setup-vscode-dind-project to add the DinD Dev Container, project-local Codex and Claude Code persistence, code/data layout, root AGENTS.md execution policy, and .instructions.md bioinformatician environment directives."
