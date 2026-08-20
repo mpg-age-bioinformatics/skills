@@ -1,0 +1,8 @@
+/.codex-home/
+/.r-library/
+/.Rhistory
+/.RData
+/.Ruserdata
+/.Rproj.user/
+/renv/library/
+/renv/staging/

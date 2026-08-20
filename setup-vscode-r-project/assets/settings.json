@@ -4,7 +4,7 @@
   "r.plot.useHttpgd": true,
   "r.sessionWatcher": true,
   "workbench.panel.defaultLocation": "bottom",
-  "workbench.sideBar.location": "right",
+  "workbench.sideBar.location": "left",
   "workbench.startupEditor": "none",
   "terminal.integrated.defaultProfile.linux": "bash"
 }

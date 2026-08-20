@@ -1,6 +1,6 @@
 {
-  "name": "R 4.4.2 Development",
-  "image": "ghcr.io/rocker-org/devcontainer/r-ver:4.4.2",
+  "name": "R __R_VERSION__ Development",
+  "image": "ghcr.io/rocker-org/devcontainer/r-ver:__R_VERSION__",
   "features": {
     "ghcr.io/rocker-org/devcontainer-features/r-packages:1": {
       "packages": "languageserver,httpgd,renv,rmarkdown",
@@ -16,7 +16,7 @@
         "r.plot.useHttpgd": true,
         "r.sessionWatcher": true,
         "workbench.panel.defaultLocation": "bottom",
-        "workbench.sideBar.location": "right",
+        "workbench.sideBar.location": "left",
         "workbench.startupEditor": "none",
         "terminal.integrated.defaultProfile.linux": "bash"
       }
@@ -30,7 +30,13 @@
       "requireLocalPort": true
     }
   },
-  "mounts": ["source=${localWorkspaceFolder}/.codex-home,target=/home/vscode/.codex,type=bind"],
-  "remoteUser": "vscode",
+  "containerEnv": {
+    "R_LIBS_USER": "/home/rstudio/R/library"
+  },
+  "mounts": [
+    "source=${localWorkspaceFolder}/.codex-home,target=/home/rstudio/.codex,type=bind",
+    "source=${localWorkspaceFolder}/.r-library,target=/home/rstudio/R/library,type=bind"
+  ],
+  "remoteUser": "rstudio",
   "shutdownAction": "stopContainer"
 }

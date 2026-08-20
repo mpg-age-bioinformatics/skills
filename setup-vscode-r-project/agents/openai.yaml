@@ -1,0 +1,4 @@
+interface:
+  display_name: "Set Up R Project"
+  short_description: "Create an R-series VS Code container"
+  default_prompt: "Use $setup-vscode-r-project to create an R Dev Container using the latest patch release in my requested R major.minor series and configure VS Code with an RStudio-like workspace."
