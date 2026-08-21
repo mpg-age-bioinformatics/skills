@@ -1,0 +1,4 @@
+interface:
+  display_name: "Match Code Data"
+  short_description: "Version data against a code commit hash"
+  default_prompt: "Use $match-code-data to snapshot code and rotate the data folder."
