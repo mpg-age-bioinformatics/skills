@@ -1,4 +1,6 @@
 /.codex-home/
+/.claude-home/
+/skills/
 /.r-library/
 /.Rhistory
 /.RData

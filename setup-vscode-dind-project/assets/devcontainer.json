@@ -32,10 +32,12 @@
 		}
 	},
 
-	// Persist Codex and Claude Code sessions and authentication in ignored project-local directories.
+	// Persist agent state and expose the cloned skills repository read-only to both agents.
 	"mounts": [
 		"source=${localWorkspaceFolder}/.codex-home,target=/home/vscode/.codex,type=bind",
-		"source=${localWorkspaceFolder}/.claude-home,target=/home/vscode/.claude,type=bind"
+		"source=${localWorkspaceFolder}/skills,target=/home/vscode/.codex/skills,type=bind,readonly",
+		"source=${localWorkspaceFolder}/.claude-home,target=/home/vscode/.claude,type=bind",
+		"source=${localWorkspaceFolder}/skills,target=/home/vscode/.claude/skills,type=bind,readonly"
 	],
 
 	"remoteUser": "vscode",

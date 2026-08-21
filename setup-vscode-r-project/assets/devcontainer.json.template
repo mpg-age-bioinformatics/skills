@@ -9,7 +9,7 @@
   },
   "customizations": {
     "vscode": {
-      "extensions": ["REditorSupport.r", "RDebugger.r-debugger", "quarto.quarto", "openai.chatgpt"],
+      "extensions": ["REditorSupport.r", "RDebugger.r-debugger", "quarto.quarto", "openai.chatgpt", "anthropic.claude-code"],
       "settings": {
         "r.alwaysUseActiveTerminal": true,
         "r.bracketedPaste": true,
@@ -35,6 +35,9 @@
   },
   "mounts": [
     "source=${localWorkspaceFolder}/.codex-home,target=/home/rstudio/.codex,type=bind",
+    "source=${localWorkspaceFolder}/skills,target=/home/rstudio/.codex/skills,type=bind,readonly",
+    "source=${localWorkspaceFolder}/.claude-home,target=/home/rstudio/.claude,type=bind",
+    "source=${localWorkspaceFolder}/skills,target=/home/rstudio/.claude/skills,type=bind,readonly",
     "source=${localWorkspaceFolder}/.r-library,target=/home/rstudio/R/library,type=bind"
   ],
   "remoteUser": "rstudio",

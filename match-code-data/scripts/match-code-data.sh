@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-commit_message="${1:-Snapshot code for data archive}"
+commit_message="${1:-Snapshot project for data archive}"
 
 repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" || {
   echo "Error: run this command inside a Git repository." >&2
@@ -30,12 +30,12 @@ if [[ -f "$git_dir/MERGE_HEAD" ]]; then
   exit 1
 fi
 
-git -C "$repo_root" add -A -- code
+git -C "$repo_root" add -A -- .
 
-git -C "$repo_root" commit --only --allow-empty --message "$commit_message" -- code
+git -C "$repo_root" commit --allow-empty --message "$commit_message"
 
-code_hash="$(git -C "$repo_root" rev-parse --short=8 HEAD)"
-archive_dir="$repo_root/data_$code_hash"
+snapshot_hash="$(git -C "$repo_root" rev-parse --short=8 HEAD)"
+archive_dir="$repo_root/data_$snapshot_hash"
 
 if [[ -e "$archive_dir" ]]; then
   echo "Error: archive already exists: $archive_dir" >&2
@@ -46,6 +46,6 @@ fi
 mv -- "$data_dir" "$archive_dir"
 mkdir -- "$data_dir"
 
-echo "Code commit: $code_hash"
-echo "Archived data: data_$code_hash"
+echo "Project commit: $snapshot_hash"
+echo "Archived data: data_$snapshot_hash"
 echo "Created empty data/"

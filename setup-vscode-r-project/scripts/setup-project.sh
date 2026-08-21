@@ -5,6 +5,7 @@ target_dir="${1:-}"
 r_version="${2:-}"
 script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 skill_dir="$(dirname -- "$script_dir")"
+skills_repository="https://github.com/mpg-age-bioinformatics/skills.git"
 
 if [[ -z "$target_dir" || -z "$r_version" ]]; then
   echo "Usage: setup-project.sh <absolute-project-directory> <R-version>" >&2
@@ -29,6 +30,20 @@ image_version="$r_major.$r_minor"
 echo "Requested R $r_version; using Rocker tag $image_version (latest patch release in that series)."
 
 mkdir -p .devcontainer .vscode code data
+if [[ -e skills ]]; then
+  if [[ ! -d skills/.git ]]; then
+    echo "Error: skills/ already exists and is not a Git clone." >&2
+    exit 1
+  fi
+  existing_skills_repository="$(git -C skills remote get-url origin 2>/dev/null || true)"
+  if [[ "$existing_skills_repository" != "$skills_repository" ]]; then
+    echo "Error: skills/ already exists with a different origin: ${existing_skills_repository:-<none>}" >&2
+    exit 1
+  fi
+else
+  git clone "$skills_repository" skills
+fi
+
 if [[ -e .codex-home && ! -d .codex-home ]]; then
   echo "Error: .codex-home exists but is not a directory." >&2
   exit 1
@@ -36,6 +51,14 @@ fi
 if [[ ! -d .codex-home ]]; then
   mkdir .codex-home
   chmod 700 .codex-home
+fi
+if [[ -e .claude-home && ! -d .claude-home ]]; then
+  echo "Error: .claude-home exists but is not a directory." >&2
+  exit 1
+fi
+if [[ ! -d .claude-home ]]; then
+  mkdir .claude-home
+  chmod 700 .claude-home
 fi
 if [[ -e .r-library && ! -d .r-library ]]; then
   echo "Error: .r-library exists but is not a directory." >&2
@@ -66,7 +89,7 @@ install_if_absent_or_identical "$skill_dir/assets/extensions.json" .vscode/exten
 if [[ ! -e .gitignore ]]; then
   cp "$skill_dir/assets/gitignore" .gitignore
 else
-  for rule in '/.codex-home/' '/.r-library/' '/.Rhistory' '/.RData' '/.Ruserdata' '/.Rproj.user/' '/renv/library/' '/renv/staging/'; do
+  for rule in '/.codex-home/' '/.claude-home/' '/skills/' '/.r-library/' '/.Rhistory' '/.RData' '/.Ruserdata' '/.Rproj.user/' '/renv/library/' '/renv/staging/'; do
     grep -Fqx "$rule" .gitignore || printf '%s\n' "$rule" >> .gitignore
   done
 fi
