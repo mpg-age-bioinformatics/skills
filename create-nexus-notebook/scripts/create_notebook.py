@@ -8,6 +8,10 @@ import json
 from pathlib import Path
 
 
+SKILL_DIR = Path(__file__).resolve().parents[1]
+AGENTS_TEMPLATE = SKILL_DIR / "assets" / "AGENTS.md"
+
+
 FIRST_CELL = '''import os
 import site
 import sys
@@ -90,12 +94,21 @@ def main() -> None:
     args = parser.parse_args()
 
     output: Path = args.name
+    agents_output = Path.cwd() / "AGENTS.md"
+    agents_text = AGENTS_TEMPLATE.read_text(encoding="utf-8")
+
     if output.exists() and not args.force:
         parser.error(f"refusing to overwrite existing file: {output}")
+    if agents_output.exists() and agents_output.read_text(encoding="utf-8") != agents_text:
+        parser.error(f"refusing to overwrite existing project instructions: {agents_output}")
 
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(build_notebook(), indent=1) + "\n", encoding="utf-8")
-    print(output.resolve())
+    if not agents_output.exists():
+        agents_output.write_text(agents_text, encoding="utf-8")
+
+    print(f"Notebook: {output.resolve()}")
+    print(f"Project instructions: {agents_output.resolve()}")
 
 
 if __name__ == "__main__":
