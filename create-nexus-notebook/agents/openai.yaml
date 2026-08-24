@@ -1,0 +1,4 @@
+interface:
+  display_name: "Create Nexus Notebook"
+  short_description: "Create a named Jupyter notebook with Nexus Python paths"
+  default_prompt: "Create a Jupyter notebook with the filename I provide and the required Nexus environment initialization cell."
