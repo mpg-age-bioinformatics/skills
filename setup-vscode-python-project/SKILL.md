@@ -1,0 +1,20 @@
+---
+name: setup-vscode-python-project
+description: Set up a repository as a Python Dev Container pinned to a requested major.minor Python series, clone the MPG Age Bioinformatics skills repository for Codex and Claude, and configure a reproducible VS Code Python workspace.
+---
+
+# Set up a Python project in VS Code
+
+Work from the current repository root. This is a one-time bootstrap for an interactive Python development workflow. Perform setup idempotently and preserve existing files; do not rerun the skill after ordinary source-code or dependency changes.
+
+1. Obtain the Python version from the caller. Accept `major.minor` or `major.minor.patch`, such as `3.12` or `3.12.4`. Normalize either form to its `major.minor` image tag, so `3.12.4` selects `mcr.microsoft.com/devcontainers/python:3.12-bookworm`, which follows the latest published patch in the Python 3.12 series. If no version was provided, ask before changing the repository; do not silently select one.
+2. Run `scripts/setup-project.sh` with the absolute repository root and requested Python version. Do not recreate its cloning, copying, substitution, or Git operations manually.
+3. The script clones `https://github.com/mpg-age-bioinformatics/skills.git` into ignored `skills/` at the project root. It preserves an existing clone only when its `origin` matches; it does not pull, reset, overwrite, or replace it. The container mounts this clone read-only at `/home/vscode/.codex/skills` and `/home/vscode/.claude/skills`.
+4. The script creates `code/`, `data/`, `.devcontainer/`, and `.vscode/` when needed, plus ignored owner-only `.codex-home/` and `.claude-home/` directories. These are mounted at the agents' home-state paths. The container creates an ignored project `.venv/` when absent, and VS Code uses `.venv/bin/python` automatically.
+5. The container includes Python, Pylance, Jupyter, Ruff, Codex, and Claude Code extensions. Generated guidance requires project dependencies to be installed only in `.venv`, direct dependencies and installation instructions to be tracked under `code/`, all versions to be exact, and a fully resolved lock file to be committed and updated with dependency changes. It also directs scientific, data-analysis, visualization, and bioinformatics work to use appropriate established packages rather than hand-written standard-library substitutes; dependency tracking is part of the work, not a reason to avoid scientific libraries. Scripts must work from the project root in a fresh process and must not rely on an interactively activated environment.
+6. If a commit fails because Git author identity is missing, do not invent or configure one. Leave files staged and tell the user to configure `user.name` and `user.email`, then rerun the skill.
+7. Reopen the folder with `Dev Containers: Reopen in Container` when a supported VS Code command interface is available. Otherwise, say `The VS Code CLI isn't available here. In VS Code's Command Palette, run:` and put the exact literal line `>Dev Containers: Reopen in Container` in a fenced code block. Never claim it was reopened unless it actually was.
+8. After startup, verify `python --version` is in the requested major.minor series, `sys.executable` resolves under the project `.venv/`, and skills are visible at both agent discovery paths. Tell the user that Python tools, notebooks, Codex, and Claude are available through VS Code.
+9. Warn that `.codex-home/` and `.claude-home/` contain sensitive plaintext state and credentials and must remain ignored, private, and uncommitted.
+
+Do not overwrite an existing Dev Container or VS Code configuration. If one conflicts, report its path and stop. Do not add unrelated runtimes, host credentials, or host filesystem mounts.

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Set Up Python Project"
+  short_description: "Create a Python-series VS Code container"
+  default_prompt: "Use $setup-vscode-python-project to create a Python Dev Container using my requested Python major.minor series and configure a reproducible VS Code Python workspace."
