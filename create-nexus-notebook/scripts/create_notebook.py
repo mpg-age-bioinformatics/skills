@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 
@@ -94,20 +96,49 @@ def main() -> None:
     args = parser.parse_args()
 
     output: Path = args.name
+    paired_output = output.with_suffix(".py")
     agents_output = Path.cwd() / "AGENTS.md"
     agents_text = AGENTS_TEMPLATE.read_text(encoding="utf-8")
 
     if output.exists() and not args.force:
         parser.error(f"refusing to overwrite existing file: {output}")
+    if paired_output.exists() and not args.force:
+        parser.error(f"refusing to overwrite existing paired file: {paired_output}")
     if agents_output.exists() and agents_output.read_text(encoding="utf-8") != agents_text:
         parser.error(f"refusing to overwrite existing project instructions: {agents_output}")
 
+    try:
+        subprocess.run(
+            [sys.executable, "-m", "jupytext", "--version"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as error:
+        parser.error(
+            "Jupytext is required in the active Python environment; install it through "
+            "the project's dependency workflow before creating the notebook pair"
+        )
+
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(build_notebook(), indent=1) + "\n", encoding="utf-8")
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "jupytext",
+            "--set-formats",
+            "ipynb,py:percent",
+            "--sync",
+            str(output),
+        ],
+        check=True,
+    )
     if not agents_output.exists():
         agents_output.write_text(agents_text, encoding="utf-8")
 
     print(f"Notebook: {output.resolve()}")
+    print(f"Paired Python file: {paired_output.resolve()}")
     print(f"Project instructions: {agents_output.resolve()}")
 
 
