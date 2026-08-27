@@ -21,3 +21,7 @@ Work from the current repository root. This is a one-time bootstrap. Perform set
 12. Verify the system and venv Python versions are in the requested series, `sys.executable` is under `.venv/`, and skills are visible to both agents. If a notebook was requested during setup, install locked dependencies and verify the Jupyter kernel.
 
 Do not create `.devcontainer/`, mount `/var/run/docker.sock`, persist plaintext agent homes in the repository, add host credential mounts, or remove a sandbox. Credential setup and sandbox removal require separate explicit authorization.
+
+## Standalone shell entrypoint
+
+`assets/python-sandox.sh` performs the same setup without first running Codex or Claude on the host. It accepts `<Python-version> <codex|claude> [project-directory]`; when either of the first two values is absent in an interactive terminal, it asks for it before doing any work. The project directory defaults to the current directory. It runs the deterministic repository setup and then starts the selected agent only through the generated Docker Sandbox launcher.

@@ -16,7 +16,8 @@ command -v sbx >/dev/null 2>&1 || { echo "Error: Docker Sandboxes CLI (sbx) is n
 
 sandbox_name="py-${project_name}-${agent}"
 template_tag="python-sandbox-${project_name}-${agent}:local"
-template_tar="$(mktemp "${TMPDIR:-/tmp}/python-sandbox-template.XXXXXX.tar")"
+temporary_root="${TMPDIR:-/tmp}"
+template_tar="$(mktemp "${temporary_root%/}/python-sandbox-template.XXXXXX")"
 trap 'rm -f "$template_tar"' EXIT
 
 docker build --build-arg "AGENT_TEMPLATE=$agent_template" -t "$template_tag" -f "$project_root/code/Dockerfile" "$project_root/code"
