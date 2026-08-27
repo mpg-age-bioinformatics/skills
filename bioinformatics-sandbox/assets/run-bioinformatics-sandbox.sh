@@ -23,4 +23,49 @@ fi
 echo "Sandbox: $sandbox_name"
 echo "VS Code Remote-SSH host: ${sandbox_name}.sbx"
 echo "Workspace: $project_root"
-exec sbx run --name "$sandbox_name" "$agent" "$project_root"
+
+if sbx ls --quiet | grep -Fqx "$sandbox_name"; then
+  sbx run --detached --name "$sandbox_name"
+else
+  sbx run --detached --name "$sandbox_name" "$agent" "$project_root"
+fi
+
+if [[ "${BIOINFORMATICS_SANDBOX_SKIP_VSCODE:-0}" == "1" ]]; then
+  echo "Skipped VS Code setup because BIOINFORMATICS_SANDBOX_SKIP_VSCODE=1."
+  exit 0
+fi
+
+if command -v code >/dev/null 2>&1; then
+  code_cli="$(command -v code)"
+else
+  code_cli=""
+  for candidate in \
+    "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code" \
+    "$HOME/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code" \
+    "/Applications/Visual Studio Code - Insiders.app/Contents/Resources/app/bin/code"; do
+    if [[ -x "$candidate" ]]; then
+      code_cli="$candidate"
+      break
+    fi
+  done
+  [[ -n "$code_cli" ]] || {
+    echo "Error: neither the code CLI nor a Visual Studio Code application bundle was found." >&2
+    exit 1
+  }
+
+  if [[ ! -e /usr/local/bin/code && -w /usr/local/bin ]]; then
+    ln -s "$code_cli" /usr/local/bin/code
+    code_cli="/usr/local/bin/code"
+    echo "Enabled the code CLI at /usr/local/bin/code."
+  else
+    echo "Using Visual Studio Code's bundled CLI at $code_cli."
+  fi
+fi
+
+sbx setup ssh
+"$code_cli" --install-extension ms-vscode-remote.remote-ssh
+remote_authority="ssh-remote+${sandbox_name}.sbx"
+for extension in ms-python.python ms-python.vscode-pylance ms-toolsai.jupyter REditorSupport.r openai.chatgpt anthropic.claude-code; do
+  "$code_cli" --remote "$remote_authority" --install-extension "$extension"
+done
+"$code_cli" --remote "$remote_authority" "$project_root"

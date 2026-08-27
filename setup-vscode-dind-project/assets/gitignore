@@ -1,11 +1,5 @@
-/.codex-home/
-/.claude-home/
-/skills/
 /*
-!/.devcontainer/
-!/.devcontainer/**
 !/.gitignore
 !AGENTS.md
-!/.vscode/
 !/code
 !.instructions.md

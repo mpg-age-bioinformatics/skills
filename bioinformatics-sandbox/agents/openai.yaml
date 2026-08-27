@@ -1,4 +1,4 @@
 interface:
   display_name: "Bioinformatics Sandbox"
   short_description: "Set up an isolated bioinformatics Docker Sandbox"
-  default_prompt: "Use $bioinformatics-sandbox to initialize this repository for bioinformatics work in a Docker Sandbox, with workload containers run inside the sandbox when needed."
+  default_prompt: "Use $bioinformatics-sandbox to initialize this repository, launch the selected agent in Docker Sandbox, and open the connected workspace automatically in VS Code Remote-SSH."

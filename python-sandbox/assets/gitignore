@@ -1,8 +1,5 @@
 /*
-!/.devcontainer/
-!/.devcontainer/**
 !/.gitignore
 !AGENTS.md
-!/.vscode/
 !/code
 !.instructions.md
