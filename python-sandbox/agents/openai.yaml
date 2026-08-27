@@ -1,0 +1,4 @@
+interface:
+  display_name: "Python Sandbox"
+  short_description: "Set up an isolated Python Docker Sandbox"
+  default_prompt: "Use $python-sandbox with Python 3.13 and Codex to initialize this repository, launch the sandbox, and open it automatically in VS Code Remote-SSH."
