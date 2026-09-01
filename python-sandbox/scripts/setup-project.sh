@@ -42,6 +42,15 @@ install_if_absent_or_identical() {
   fi
 }
 
+install_dir_if_absent_or_identical() {
+  local source_path="$1" destination_path="$2"
+  if [[ -e "$destination_path" ]]; then
+    diff -qr "$source_path" "$destination_path" >/dev/null || { echo "Error: refusing to overwrite existing $destination_path" >&2; exit 1; }
+  else
+    cp -R "$source_path" "$destination_path"
+  fi
+}
+
 generated_dockerfile="$(mktemp)"
 generated_command="$(mktemp)"
 trap 'rm -f "$generated_dockerfile" "$generated_command"' EXIT
@@ -50,8 +59,10 @@ sed -e "s/__AGENT__/${agent}/g" "$skill_dir/assets/run-python-sandbox.command.te
 install_if_absent_or_identical "$generated_dockerfile" code/Dockerfile
 install_if_absent_or_identical "$skill_dir/assets/run-python-sandbox.sh" code/run-python-sandbox.sh
 install_if_absent_or_identical "$generated_command" code/run-python-sandbox.command
+install_dir_if_absent_or_identical "$skill_dir/assets/Run Python Sandbox.app.template" "code/Run Python Sandbox.app"
 chmod +x code/run-python-sandbox.sh
 chmod 755 code/run-python-sandbox.command
+chmod 755 "code/Run Python Sandbox.app/Contents/MacOS/run-python-sandbox"
 install_if_absent_or_identical "$skill_dir/assets/settings.json" .vscode/settings.json
 install_if_absent_or_identical "$skill_dir/assets/extensions.json" .vscode/extensions.json
 install_if_absent_or_identical "$skill_dir/assets/.instructions.md" .instructions.md
@@ -68,7 +79,7 @@ fi
 
 git init
 if git rev-parse --verify HEAD >/dev/null 2>&1; then
-  git add -A -- .vscode .gitignore AGENTS.md .instructions.md code/Dockerfile code/run-python-sandbox.sh code/run-python-sandbox.command
+  git add -A -- .vscode .gitignore AGENTS.md .instructions.md code/Dockerfile code/run-python-sandbox.sh code/run-python-sandbox.command "code/Run Python Sandbox.app"
   if git diff --cached --quiet; then
     echo "Python Sandbox setup is already committed."
   else
