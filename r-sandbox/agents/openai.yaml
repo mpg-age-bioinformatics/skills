@@ -1,0 +1,4 @@
+interface:
+  display_name: "R Sandbox"
+  short_description: "Set up an isolated R Docker Sandbox"
+  default_prompt: "Use $r-sandbox with R 4.5 and Codex to initialize this repository, launch the sandbox, and open it automatically in VS Code Remote-SSH."
