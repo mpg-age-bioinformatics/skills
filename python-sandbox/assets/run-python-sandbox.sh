@@ -11,11 +11,20 @@ esac
 project_root="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 project_name="$(basename -- "$project_root" | tr '[:upper:]_' '[:lower:]-' | tr -cd 'a-z0-9.-')"
 [[ -n "$project_name" ]] || { echo "Error: invalid project directory name." >&2; exit 2; }
+if workspace_stat="$(stat -f '%d:%i' "$project_root" 2>/dev/null)"; then
+  :
+elif workspace_stat="$(stat -c '%d:%i' "$project_root" 2>/dev/null)"; then
+  :
+else
+  echo "Error: could not determine the project directory identity: $project_root" >&2
+  exit 1
+fi
+workspace_id="$(printf '%s:%s' "$project_root" "$workspace_stat" | cksum | awk '{print $1}')"
 command -v docker >/dev/null 2>&1 || { echo "Error: Docker CLI is required to build the sandbox template." >&2; exit 1; }
 command -v sbx >/dev/null 2>&1 || { echo "Error: Docker Sandboxes CLI (sbx) is not installed." >&2; exit 1; }
 
-sandbox_name="py-${project_name}-${agent}"
-template_tag="python-sandbox-${project_name}-${agent}:local"
+sandbox_name="py-${project_name}-${workspace_id}-${agent}"
+template_tag="python-sandbox-${project_name}-${workspace_id}-${agent}:local"
 temporary_root="${TMPDIR:-/tmp}"
 template_tar="$(mktemp "${temporary_root%/}/python-sandbox-template.XXXXXX")"
 trap 'rm -f "$template_tar"' EXIT
