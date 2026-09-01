@@ -43,11 +43,15 @@ install_if_absent_or_identical() {
 }
 
 generated_dockerfile="$(mktemp)"
-trap 'rm -f "$generated_dockerfile"' EXIT
+generated_command="$(mktemp)"
+trap 'rm -f "$generated_dockerfile" "$generated_command"' EXIT
 sed -e "s/__PYTHON_VERSION__/${image_version}/g" -e "s/__AGENT_TEMPLATE__/${agent_template}/g" "$skill_dir/assets/Dockerfile.template" > "$generated_dockerfile"
+sed -e "s/__AGENT__/${agent}/g" "$skill_dir/assets/run-python-sandbox.command.template" > "$generated_command"
 install_if_absent_or_identical "$generated_dockerfile" code/Dockerfile
 install_if_absent_or_identical "$skill_dir/assets/run-python-sandbox.sh" code/run-python-sandbox.sh
+install_if_absent_or_identical "$generated_command" code/run-python-sandbox.command
 chmod +x code/run-python-sandbox.sh
+chmod 755 code/run-python-sandbox.command
 install_if_absent_or_identical "$skill_dir/assets/settings.json" .vscode/settings.json
 install_if_absent_or_identical "$skill_dir/assets/extensions.json" .vscode/extensions.json
 install_if_absent_or_identical "$skill_dir/assets/.instructions.md" .instructions.md
@@ -64,7 +68,7 @@ fi
 
 git init
 if git rev-parse --verify HEAD >/dev/null 2>&1; then
-  git add -A -- .vscode .gitignore AGENTS.md .instructions.md code/Dockerfile code/run-python-sandbox.sh
+  git add -A -- .vscode .gitignore AGENTS.md .instructions.md code/Dockerfile code/run-python-sandbox.sh code/run-python-sandbox.command
   if git diff --cached --quiet; then
     echo "Python Sandbox setup is already committed."
   else
