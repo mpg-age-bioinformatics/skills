@@ -2,14 +2,19 @@
 set -euo pipefail
 
 target_dir="${1:-}"
+agent="${2:-}"
 script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 skill_dir="$(dirname -- "$script_dir")"
 skills_repository="https://github.com/mpg-age-bioinformatics/skills.git"
 
 if [[ -z "$target_dir" || "$target_dir" != /* || ! -d "$target_dir" ]]; then
-  echo "Usage: setup-project.sh <absolute-existing-project-directory>" >&2
+  echo "Usage: setup-project.sh <absolute-existing-project-directory> <codex|claude>" >&2
   exit 2
 fi
+case "$agent" in
+  codex|claude) ;;
+  *) echo "Error: agent must be codex or claude." >&2; exit 2 ;;
+esac
 
 cd "$target_dir"
 mkdir -p code data .vscode
@@ -52,6 +57,7 @@ install_if_absent_or_identical "$skill_dir/assets/.instructions.md" .instruction
 install_if_absent_or_identical "$skill_dir/assets/extensions.json" .vscode/extensions.json
 install_if_absent_or_identical "$skill_dir/assets/settings.json" .vscode/settings.json
 install_if_absent_or_identical "$skill_dir/assets/run-bioinformatics-sandbox.sh" code/run-bioinformatics-sandbox.sh
+install_if_absent_or_identical "$skill_dir/assets/windows-project-runner/runner-$agent.exe" "code/Run Bioinformatics Sandbox.exe"
 chmod +x code/run-bioinformatics-sandbox.sh
 
 if [[ ! -e .gitignore ]]; then
@@ -64,15 +70,16 @@ else
 fi
 
 git init
+setup_paths=(.vscode .gitignore AGENTS.md .instructions.md code/run-bioinformatics-sandbox.sh "code/Run Bioinformatics Sandbox.exe")
 if git rev-parse --verify HEAD >/dev/null 2>&1; then
-  git add -A -- .vscode .gitignore AGENTS.md .instructions.md code/run-bioinformatics-sandbox.sh
+  git add -f -A -- "${setup_paths[@]}"
   if git diff --cached --quiet; then
     echo "Bioinformatics Sandbox setup is already committed."
   else
     git commit -m "Add bioinformatics sandbox setup"
   fi
 else
-  git add -A
+  git add -f -A -- "${setup_paths[@]}"
   git commit -m "Initial bioinformatics sandbox setup"
 fi
 

@@ -47,6 +47,7 @@ trap 'rm -f "$generated_dockerfile"' EXIT
 sed -e "s/__R_VERSION__/${image_version}/g" -e "s/__AGENT_TEMPLATE__/${agent_template}/g" "$skill_dir/assets/Dockerfile.template" > "$generated_dockerfile"
 install_if_absent_or_identical "$generated_dockerfile" code/Dockerfile
 install_if_absent_or_identical "$skill_dir/assets/run-r-sandbox.sh" code/run-r-sandbox.sh
+install_if_absent_or_identical "$skill_dir/assets/windows-project-runner/runner-$agent.exe" "code/Run R Sandbox.exe"
 chmod +x code/run-r-sandbox.sh
 install_if_absent_or_identical "$skill_dir/assets/settings.json" .vscode/settings.json
 install_if_absent_or_identical "$skill_dir/assets/extensions.json" .vscode/extensions.json
@@ -70,15 +71,16 @@ else
 fi
 
 git init
+setup_paths=(.vscode .gitignore .Renviron AGENTS.md .instructions.md code/Dockerfile code/run-r-sandbox.sh "code/Run R Sandbox.exe")
 if git rev-parse --verify HEAD >/dev/null 2>&1; then
-  git add -A -- .vscode .gitignore .Renviron AGENTS.md .instructions.md code/Dockerfile code/run-r-sandbox.sh
+  git add -f -A -- "${setup_paths[@]}"
   if git diff --cached --quiet; then
     echo "R Sandbox setup is already committed."
   else
     git commit -m "Add R sandbox setup"
   fi
 else
-  git add -A
+  git add -f -A -- "${setup_paths[@]}"
   git commit -m "Initial R sandbox setup"
 fi
 

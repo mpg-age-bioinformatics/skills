@@ -29,5 +29,5 @@ setup_script="$skill_dir/scripts/setup-project.sh"
   exit 1
 }
 
-"$setup_script" "$project_dir"
+"$setup_script" "$project_dir" "$agent"
 exec "$project_dir/code/run-bioinformatics-sandbox.sh" "$agent"
