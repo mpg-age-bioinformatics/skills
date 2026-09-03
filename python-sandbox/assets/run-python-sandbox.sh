@@ -9,8 +9,33 @@ case "$agent" in
 esac
 
 project_root="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
-project_name="$(basename -- "$project_root" | tr '[:upper:]_' '[:lower:]-' | tr -cd 'a-z0-9.-')"
-[[ -n "$project_name" ]] || { echo "Error: invalid project directory name." >&2; exit 2; }
+windows_git_bash=0
+case "${OSTYPE:-}:${MSYSTEM:-}" in
+  msys*:MINGW* | cygwin*:MINGW*) windows_git_bash=1 ;;
+esac
+
+host_path() {
+  if (( windows_git_bash )); then
+    cygpath -w "$1"
+  else
+    printf '%s\n' "$1"
+  fi
+}
+
+native_exec() {
+  if (( windows_git_bash )); then
+    MSYS2_ARG_CONV_EXCL='*' "$@"
+  else
+    "$@"
+  fi
+}
+
+project_name="$(basename -- "$project_root" | tr '[:upper:]_' '[:lower:]-' | tr -cd 'a-z0-9.-' | sed -E 's/^[.-]+//; s/[.-]+$//' | cut -c 1-32)"
+project_name="${project_name:-project}"
+workspace_key="$project_root"
+if (( windows_git_bash )); then
+  workspace_key="$(cygpath -m "$project_root" | tr '[:upper:]' '[:lower:]')"
+fi
 if workspace_stat="$(stat -f '%d:%i' "$project_root" 2>/dev/null)"; then
   :
 elif workspace_stat="$(stat -c '%d:%i' "$project_root" 2>/dev/null)"; then
@@ -19,9 +44,21 @@ else
   echo "Error: could not determine the project directory identity: $project_root" >&2
   exit 1
 fi
-workspace_id="$(printf '%s:%s' "$project_root" "$workspace_stat" | cksum | awk '{print $1}')"
+workspace_id="$(printf '%s:%s' "$workspace_key" "$workspace_stat" | cksum | awk '{print $1}')"
 command -v docker >/dev/null 2>&1 || { echo "Error: Docker CLI is required to build the sandbox template." >&2; exit 1; }
 command -v sbx >/dev/null 2>&1 || { echo "Error: Docker Sandboxes CLI (sbx) is not installed." >&2; exit 1; }
+if [[ "${PYTHON_SANDBOX_SKIP_VSCODE:-0}" != "1" ]]; then
+  command -v ssh >/dev/null 2>&1 || { echo "Error: an OpenSSH client is required for VS Code Remote-SSH." >&2; exit 1; }
+fi
+sbx_version="$(native_exec sbx version 2>&1)" || { echo "Error: 'sbx version' failed: $sbx_version" >&2; exit 1; }
+if [[ ! "$sbx_version" =~ (Client[[:space:]]Version:|sbx[[:space:]]version:)[[:space:]]v?([0-9]+)\.([0-9]+)\.([0-9]+) ]] ||
+   (( 10#${BASH_REMATCH[2]} == 0 && 10#${BASH_REMATCH[3]} < 39 )); then
+  echo "Error: Docker Sandboxes 0.39.0 or newer is required. Detected: $sbx_version" >&2
+  exit 1
+fi
+native_exec sbx diagnose || { echo "Error: Docker Sandboxes diagnostics failed. Confirm virtualization and authentication." >&2; exit 1; }
+docker_os="$(native_exec docker info --format '{{.OSType}}' 2>/dev/null)" || { echo "Error: the Docker daemon is unavailable. Start Docker Desktop and retry." >&2; exit 1; }
+[[ "$(printf '%s' "$docker_os" | tr '[:upper:]' '[:lower:]')" == "linux" ]] || { echo "Error: Docker must be running Linux containers; detected: $docker_os" >&2; exit 1; }
 
 sandbox_name="py-${project_name}-${workspace_id}-${agent}"
 template_tag="python-sandbox-${project_name}-${workspace_id}-${agent}:local"
@@ -29,23 +66,23 @@ temporary_root="${TMPDIR:-/tmp}"
 template_tar="$(mktemp "${temporary_root%/}/python-sandbox-template.XXXXXX")"
 trap 'rm -f "$template_tar"' EXIT
 
-docker build --build-arg "AGENT_TEMPLATE=$agent_template" -t "$template_tag" -f "$project_root/code/Dockerfile" "$project_root/code"
-docker image save "$template_tag" -o "$template_tar"
-sbx template load "$template_tar"
+native_exec docker build --build-arg "AGENT_TEMPLATE=$agent_template" -t "$template_tag" -f "$(host_path "$project_root/code/Dockerfile")" "$(host_path "$project_root/code")"
+native_exec docker image save "$template_tag" -o "$(host_path "$template_tar")"
+native_exec sbx template load "$(host_path "$template_tar")"
 
 echo "Sandbox: $sandbox_name"
 echo "VS Code Remote-SSH host: ${sandbox_name}.sbx"
 echo "Workspace: $project_root"
 
-if sbx ls --quiet | grep -Fqx "$sandbox_name"; then
-  sbx run --detached --name "$sandbox_name"
+if native_exec sbx ls --quiet | grep -Fqx "$sandbox_name"; then
+  native_exec sbx run --detached --name "$sandbox_name"
 else
-  sbx run --detached --name "$sandbox_name" --template "$template_tag" "$agent" "$project_root"
+  native_exec sbx run --detached --name "$sandbox_name" --template "$template_tag" "$agent" "$(host_path "$project_root")"
 fi
 
 python_series="$(sed -n 's/^ARG PYTHON_IMAGE=python:\([0-9][0-9]*\.[0-9][0-9]*\)-bookworm$/\1/p' "$project_root/code/Dockerfile")"
 [[ -n "$python_series" ]] || { echo "Error: could not determine the Python series from code/Dockerfile." >&2; exit 1; }
-sbx exec --env "EXPECTED_PYTHON_SERIES=$python_series" --workdir "$project_root" "$sandbox_name" sh -c \
+native_exec sbx exec --env "EXPECTED_PYTHON_SERIES=$python_series" --workdir "$project_root" "$sandbox_name" sh -c \
   'set -e; test -x .venv/bin/python || python -m venv .venv; test -x .venv/bin/python; .venv/bin/python -c "import os, sys; expected = tuple(map(int, os.environ[\"EXPECTED_PYTHON_SERIES\"].split(\".\"))); assert sys.version_info[:2] == expected, (sys.version, expected); print(sys.executable); print(sys.version)"'
 
 if [[ "${PYTHON_SANDBOX_SKIP_VSCODE:-0}" == "1" ]]; then
@@ -80,10 +117,18 @@ else
   fi
 fi
 
-sbx setup ssh
-"$code_cli" --install-extension ms-vscode-remote.remote-ssh
+native_exec sbx setup ssh
+native_exec "$code_cli" --install-extension ms-vscode-remote.remote-ssh
 remote_authority="ssh-remote+${sandbox_name}.sbx"
-for extension in ms-python.python ms-python.vscode-pylance ms-toolsai.jupyter charliermarsh.ruff REditorSupport.r openai.chatgpt anthropic.claude-code; do
-  "$code_cli" --remote "$remote_authority" --install-extension "$extension"
+required_extensions=(ms-python.python ms-python.vscode-pylance ms-toolsai.jupyter charliermarsh.ruff REditorSupport.r openai.chatgpt anthropic.claude-code)
+for extension in "${required_extensions[@]}"; do
+  native_exec "$code_cli" --remote "$remote_authority" --install-extension "$extension"
 done
-"$code_cli" --remote "$remote_authority" "$project_root"
+remote_extensions="$(native_exec "$code_cli" --remote "$remote_authority" --list-extensions | tr '[:upper:]' '[:lower:]')"
+for extension in "${required_extensions[@]}"; do
+  if ! printf '%s\n' "$remote_extensions" | grep -Fxiq "$(printf '%s' "$extension" | tr '[:upper:]' '[:lower:]')"; then
+    echo "Error: VS Code extension was not installed in $remote_authority: $extension" >&2
+    exit 1
+  fi
+done
+native_exec "$code_cli" --remote "$remote_authority" "$project_root"

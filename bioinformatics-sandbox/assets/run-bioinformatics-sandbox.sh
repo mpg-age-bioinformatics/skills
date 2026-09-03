@@ -8,26 +8,55 @@ if [[ "$agent" != "codex" && "$agent" != "claude" ]]; then
 fi
 
 project_root="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
-project_name="$(basename -- "$project_root" | tr '[:upper:]_' '[:lower:]-' | tr -cd 'a-z0-9.-')"
-if [[ -z "$project_name" ]]; then
-  echo "Error: project directory name does not contain a valid sandbox-name character." >&2
-  exit 2
-fi
+windows_git_bash=0
+case "${OSTYPE:-}:${MSYSTEM:-}" in
+  msys*:MINGW* | cygwin*:MINGW*) windows_git_bash=1 ;;
+esac
+host_path() {
+  if (( windows_git_bash )); then cygpath -w "$1"; else printf '%s\n' "$1"; fi
+}
+native_exec() {
+  if (( windows_git_bash )); then MSYS2_ARG_CONV_EXCL='*' "$@"; else "$@"; fi
+}
 
-sandbox_name="bio-${project_name}-${agent}"
+project_name="$(basename -- "$project_root" | tr '[:upper:]_' '[:lower:]-' | tr -cd 'a-z0-9.-' | sed -E 's/^[.-]+//; s/[.-]+$//' | cut -c 1-32)"
+project_name="${project_name:-project}"
+workspace_key="$project_root"
+if (( windows_git_bash )); then workspace_key="$(cygpath -m "$project_root" | tr '[:upper:]' '[:lower:]')"; fi
+if workspace_stat="$(stat -f '%d:%i' "$project_root" 2>/dev/null)"; then
+  :
+elif workspace_stat="$(stat -c '%d:%i' "$project_root" 2>/dev/null)"; then
+  :
+else
+  echo "Error: could not determine the project directory identity: $project_root" >&2
+  exit 1
+fi
+workspace_id="$(printf '%s:%s' "$workspace_key" "$workspace_stat" | cksum | awk '{print $1}')"
+
+sandbox_name="bio-${project_name}-${workspace_id}-${agent}"
 if ! command -v sbx >/dev/null 2>&1; then
   echo "Error: Docker Sandboxes CLI (sbx) is not installed on the host." >&2
   exit 1
 fi
+if [[ "${BIOINFORMATICS_SANDBOX_SKIP_VSCODE:-0}" != "1" ]]; then
+  command -v ssh >/dev/null 2>&1 || { echo "Error: an OpenSSH client is required for VS Code Remote-SSH." >&2; exit 1; }
+fi
+sbx_version="$(native_exec sbx version 2>&1)" || { echo "Error: 'sbx version' failed: $sbx_version" >&2; exit 1; }
+if [[ ! "$sbx_version" =~ (Client[[:space:]]Version:|sbx[[:space:]]version:)[[:space:]]v?([0-9]+)\.([0-9]+)\.([0-9]+) ]] ||
+   (( 10#${BASH_REMATCH[2]} == 0 && 10#${BASH_REMATCH[3]} < 39 )); then
+  echo "Error: Docker Sandboxes 0.39.0 or newer is required. Detected: $sbx_version" >&2
+  exit 1
+fi
+native_exec sbx diagnose || { echo "Error: Docker Sandboxes diagnostics failed. Confirm virtualization and authentication." >&2; exit 1; }
 
 echo "Sandbox: $sandbox_name"
 echo "VS Code Remote-SSH host: ${sandbox_name}.sbx"
 echo "Workspace: $project_root"
 
-if sbx ls --quiet | grep -Fqx "$sandbox_name"; then
-  sbx run --detached --name "$sandbox_name"
+if native_exec sbx ls --quiet | grep -Fqx "$sandbox_name"; then
+  native_exec sbx run --detached --name "$sandbox_name"
 else
-  sbx run --detached --name "$sandbox_name" "$agent" "$project_root"
+  native_exec sbx run --detached --name "$sandbox_name" "$agent" "$(host_path "$project_root")"
 fi
 
 if [[ "${BIOINFORMATICS_SANDBOX_SKIP_VSCODE:-0}" == "1" ]]; then
@@ -62,10 +91,18 @@ else
   fi
 fi
 
-sbx setup ssh
-"$code_cli" --install-extension ms-vscode-remote.remote-ssh
+native_exec sbx setup ssh
+native_exec "$code_cli" --install-extension ms-vscode-remote.remote-ssh
 remote_authority="ssh-remote+${sandbox_name}.sbx"
-for extension in ms-python.python ms-python.vscode-pylance ms-toolsai.jupyter REditorSupport.r openai.chatgpt anthropic.claude-code; do
-  "$code_cli" --remote "$remote_authority" --install-extension "$extension"
+required_extensions=(ms-python.python ms-python.vscode-pylance ms-toolsai.jupyter REditorSupport.r openai.chatgpt anthropic.claude-code)
+for extension in "${required_extensions[@]}"; do
+  native_exec "$code_cli" --remote "$remote_authority" --install-extension "$extension"
 done
-"$code_cli" --remote "$remote_authority" "$project_root"
+remote_extensions="$(native_exec "$code_cli" --remote "$remote_authority" --list-extensions | tr '[:upper:]' '[:lower:]')"
+for extension in "${required_extensions[@]}"; do
+  if ! printf '%s\n' "$remote_extensions" | grep -Fxiq "$(printf '%s' "$extension" | tr '[:upper:]' '[:lower:]')"; then
+    echo "Error: VS Code extension was not installed in $remote_authority: $extension" >&2
+    exit 1
+  fi
+done
+native_exec "$code_cli" --remote "$remote_authority" "$project_root"

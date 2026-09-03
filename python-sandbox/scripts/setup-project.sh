@@ -6,7 +6,8 @@ python_version="${2:-}"
 agent="${3:-}"
 script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 skill_dir="$(dirname -- "$script_dir")"
-skills_repository="https://github.com/mpg-age-bioinformatics/skills.git"
+skills_repository="${PYTHON_SANDBOX_SKILLS_REPOSITORY:-https://github.com/mpg-age-bioinformatics/skills.git}"
+skills_ref="${PYTHON_SANDBOX_SKILLS_REF:-}"
 
 if [[ -z "$target_dir" || -z "$python_version" || -z "$agent" ]]; then
   echo "Usage: setup-project.sh <absolute-project-directory> <Python-version> <codex|claude>" >&2
@@ -30,7 +31,11 @@ if [[ -e skills ]]; then
   existing_origin="$(git -C skills remote get-url origin 2>/dev/null || true)"
   [[ "$existing_origin" == "$skills_repository" ]] || { echo "Error: skills/ has a different origin: ${existing_origin:-<none>}" >&2; exit 1; }
 else
-  git clone "$skills_repository" skills
+  git -c core.autocrlf=false clone "$skills_repository" skills
+  if [[ -n "$skills_ref" ]]; then
+    git -C skills fetch --quiet --depth 1 origin "$skills_ref"
+    git -C skills checkout --quiet --detach FETCH_HEAD
+  fi
 fi
 
 install_if_absent_or_identical() {
@@ -78,18 +83,27 @@ else
   done < "$skill_dir/assets/gitignore"
 fi
 
+if [[ ! -e .gitattributes ]]; then
+  cp "$skill_dir/assets/gitattributes" .gitattributes
+else
+  while IFS= read -r rule; do
+    [[ -z "$rule" ]] && continue
+    grep -Fqx "$rule" .gitattributes || printf '%s\n' "$rule" >> .gitattributes
+  done < "$skill_dir/assets/gitattributes"
+fi
+
 git init
-setup_paths=(.vscode .gitignore AGENTS.md .instructions.md code/Dockerfile code/run-python-sandbox.sh code/run-python-sandbox.command "code/Run Python Sandbox.app" "code/Run Python Sandbox.exe")
+setup_paths=(.vscode/settings.json .vscode/extensions.json .gitignore .gitattributes AGENTS.md .instructions.md code/Dockerfile code/run-python-sandbox.sh code/run-python-sandbox.command "code/Run Python Sandbox.app" "code/Run Python Sandbox.exe")
 if git rev-parse --verify HEAD >/dev/null 2>&1; then
   git add -f -A -- "${setup_paths[@]}"
-  if git diff --cached --quiet; then
+  if git diff --cached --quiet -- "${setup_paths[@]}"; then
     echo "Python Sandbox setup is already committed."
   else
-    git commit -m "Add Python sandbox setup"
+    git commit --only -m "Add Python sandbox setup" -- "${setup_paths[@]}"
   fi
 else
   git add -f -A -- "${setup_paths[@]}"
-  git commit -m "Initial Python sandbox setup"
+  git commit --only -m "Initial Python sandbox setup" -- "${setup_paths[@]}"
 fi
 
 git status --short

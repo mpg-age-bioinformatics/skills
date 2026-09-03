@@ -62,6 +62,13 @@ if [[ -z "$project_dir" ]]; then
   fi
 fi
 
+case "$project_dir" in
+  //*) echo "Error: network and WSL project directories are not supported: $project_dir" >&2; exit 2 ;;
+esac
+if [[ "$project_dir" == /* && ! -e "$project_dir" ]]; then
+  echo "Creating project directory: $project_dir"
+  mkdir -p "$project_dir"
+fi
 [[ "$project_dir" == /* && -d "$project_dir" ]] || {
   echo "Error: project directory must be an absolute existing path: $project_dir" >&2
   exit 2

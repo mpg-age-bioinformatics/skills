@@ -9,35 +9,70 @@ case "$agent" in
 esac
 
 project_root="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
-project_name="$(basename -- "$project_root" | tr '[:upper:]_' '[:lower:]-' | tr -cd 'a-z0-9.-')"
-[[ -n "$project_name" ]] || { echo "Error: invalid project directory name." >&2; exit 2; }
+windows_git_bash=0
+case "${OSTYPE:-}:${MSYSTEM:-}" in
+  msys*:MINGW* | cygwin*:MINGW*) windows_git_bash=1 ;;
+esac
+
+host_path() {
+  if (( windows_git_bash )); then cygpath -w "$1"; else printf '%s\n' "$1"; fi
+}
+native_exec() {
+  if (( windows_git_bash )); then MSYS2_ARG_CONV_EXCL='*' "$@"; else "$@"; fi
+}
+
+project_name="$(basename -- "$project_root" | tr '[:upper:]_' '[:lower:]-' | tr -cd 'a-z0-9.-' | sed -E 's/^[.-]+//; s/[.-]+$//' | cut -c 1-32)"
+project_name="${project_name:-project}"
+workspace_key="$project_root"
+if (( windows_git_bash )); then workspace_key="$(cygpath -m "$project_root" | tr '[:upper:]' '[:lower:]')"; fi
+if workspace_stat="$(stat -f '%d:%i' "$project_root" 2>/dev/null)"; then
+  :
+elif workspace_stat="$(stat -c '%d:%i' "$project_root" 2>/dev/null)"; then
+  :
+else
+  echo "Error: could not determine the project directory identity: $project_root" >&2
+  exit 1
+fi
+workspace_id="$(printf '%s:%s' "$workspace_key" "$workspace_stat" | cksum | awk '{print $1}')"
 command -v docker >/dev/null 2>&1 || { echo "Error: Docker CLI is required to build the sandbox template." >&2; exit 1; }
 command -v sbx >/dev/null 2>&1 || { echo "Error: Docker Sandboxes CLI (sbx) is not installed." >&2; exit 1; }
+if [[ "${R_SANDBOX_SKIP_VSCODE:-0}" != "1" ]]; then
+  command -v ssh >/dev/null 2>&1 || { echo "Error: an OpenSSH client is required for VS Code Remote-SSH." >&2; exit 1; }
+fi
+sbx_version="$(native_exec sbx version 2>&1)" || { echo "Error: 'sbx version' failed: $sbx_version" >&2; exit 1; }
+if [[ ! "$sbx_version" =~ (Client[[:space:]]Version:|sbx[[:space:]]version:)[[:space:]]v?([0-9]+)\.([0-9]+)\.([0-9]+) ]] ||
+   (( 10#${BASH_REMATCH[2]} == 0 && 10#${BASH_REMATCH[3]} < 39 )); then
+  echo "Error: Docker Sandboxes 0.39.0 or newer is required. Detected: $sbx_version" >&2
+  exit 1
+fi
+native_exec sbx diagnose || { echo "Error: Docker Sandboxes diagnostics failed. Confirm virtualization and authentication." >&2; exit 1; }
+docker_os="$(native_exec docker info --format '{{.OSType}}' 2>/dev/null)" || { echo "Error: the Docker daemon is unavailable. Start Docker Desktop and retry." >&2; exit 1; }
+[[ "$(printf '%s' "$docker_os" | tr '[:upper:]' '[:lower:]')" == "linux" ]] || { echo "Error: Docker must be running Linux containers; detected: $docker_os" >&2; exit 1; }
 
-sandbox_name="r-${project_name}-${agent}"
-template_tag="r-sandbox-${project_name}-${agent}:local"
+sandbox_name="r-${project_name}-${workspace_id}-${agent}"
+template_tag="r-sandbox-${project_name}-${workspace_id}-${agent}:local"
 temporary_root="${TMPDIR:-/tmp}"
 template_tar="$(mktemp "${temporary_root%/}/r-sandbox-template.XXXXXX")"
 trap 'rm -f "$template_tar"' EXIT
 
-docker build --build-arg "AGENT_TEMPLATE=$agent_template" -t "$template_tag" -f "$project_root/code/Dockerfile" "$project_root/code"
-docker image save "$template_tag" -o "$template_tar"
-sbx template load "$template_tar"
+native_exec docker build --build-arg "AGENT_TEMPLATE=$agent_template" -t "$template_tag" -f "$(host_path "$project_root/code/Dockerfile")" "$(host_path "$project_root/code")"
+native_exec docker image save "$template_tag" -o "$(host_path "$template_tar")"
+native_exec sbx template load "$(host_path "$template_tar")"
 
 echo "Sandbox: $sandbox_name"
 echo "VS Code Remote-SSH host: ${sandbox_name}.sbx"
 echo "Workspace: $project_root"
 r_library="$project_root/.r-library"
 
-if sbx ls --quiet | grep -Fqx "$sandbox_name"; then
-  sbx run --detached --env "R_LIBS_USER=$r_library" --name "$sandbox_name"
+if native_exec sbx ls --quiet | grep -Fqx "$sandbox_name"; then
+  native_exec sbx run --detached --env "R_LIBS_USER=$r_library" --name "$sandbox_name"
 else
-  sbx run --detached --env "R_LIBS_USER=$r_library" --name "$sandbox_name" --template "$template_tag" "$agent" "$project_root"
+  native_exec sbx run --detached --env "R_LIBS_USER=$r_library" --name "$sandbox_name" --template "$template_tag" "$agent" "$(host_path "$project_root")"
 fi
 
 r_series="$(sed -n 's/^ARG R_IMAGE=ghcr.io\/rocker-org\/devcontainer\/r-ver:\([0-9][0-9]*\.[0-9][0-9]*\)$/\1/p' "$project_root/code/Dockerfile")"
 [[ -n "$r_series" ]] || { echo "Error: could not determine the R series from code/Dockerfile." >&2; exit 1; }
-sbx exec --env "EXPECTED_R_SERIES=$r_series" --env "R_LIBS_USER=$r_library" --workdir "$project_root" "$sandbox_name" Rscript -e \
+native_exec sbx exec --env "EXPECTED_R_SERIES=$r_series" --env "R_LIBS_USER=$r_library" --workdir "$project_root" "$sandbox_name" Rscript -e \
   'actual <- paste(R.version$major, strsplit(R.version$minor, ".", fixed=TRUE)[[1]][1], sep="."); stopifnot(identical(actual, Sys.getenv("EXPECTED_R_SERIES")), normalizePath(Sys.getenv("R_LIBS_USER"), mustWork=TRUE) %in% normalizePath(.libPaths(), mustWork=FALSE), requireNamespace("BiocManager", quietly=TRUE), requireNamespace("languageserver", quietly=TRUE), as.character(utils::packageVersion("languageserver")) == "0.3.18"); cat(R.version.string, "\n"); cat("BiocManager", as.character(utils::packageVersion("BiocManager")), "\n"); cat("languageserver", as.character(utils::packageVersion("languageserver")), "\n"); cat(.libPaths(), sep="\n")'
 
 if [[ "${R_SANDBOX_SKIP_VSCODE:-0}" == "1" ]]; then
@@ -62,15 +97,15 @@ else
   fi
 fi
 
-sbx setup ssh
-"$code_cli" --install-extension ms-vscode-remote.remote-ssh --force
+native_exec sbx setup ssh
+native_exec "$code_cli" --install-extension ms-vscode-remote.remote-ssh --force
 remote_authority="ssh-remote+${sandbox_name}.sbx"
 required_extensions=(REditorSupport.r RDebugger.r-debugger quarto.quarto openai.chatgpt anthropic.claude-code)
 for extension in "${required_extensions[@]}"; do
-  "$code_cli" --remote "$remote_authority" --install-extension "$extension" --force
+  native_exec "$code_cli" --remote "$remote_authority" --install-extension "$extension" --force
 done
 
-remote_extensions="$("$code_cli" --remote "$remote_authority" --list-extensions | tr '[:upper:]' '[:lower:]')"
+remote_extensions="$(native_exec "$code_cli" --remote "$remote_authority" --list-extensions | tr '[:upper:]' '[:lower:]')"
 for extension in "${required_extensions[@]}"; do
   extension_lower="$(printf '%s' "$extension" | tr '[:upper:]' '[:lower:]')"
   if ! printf '%s\n' "$remote_extensions" | grep -Fxiq "$extension_lower"; then
@@ -79,4 +114,4 @@ for extension in "${required_extensions[@]}"; do
   fi
 done
 
-"$code_cli" --remote "$remote_authority" "$project_root"
+native_exec "$code_cli" --remote "$remote_authority" "$project_root"

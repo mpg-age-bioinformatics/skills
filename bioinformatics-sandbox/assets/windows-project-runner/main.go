@@ -69,23 +69,31 @@ func run() error {
 }
 
 func findGitBash() (string, error) {
-	if path, err := exec.LookPath("bash.exe"); err == nil {
-		return path, nil
-	}
 	candidates := []string{
 		filepath.Join(os.Getenv("ProgramFiles"), "Git", "bin", "bash.exe"),
 		filepath.Join(os.Getenv("ProgramFiles"), "Git", "usr", "bin", "bash.exe"),
 		filepath.Join(os.Getenv("LocalAppData"), "Programs", "Git", "bin", "bash.exe"),
 	}
+	if path, err := exec.LookPath("bash.exe"); err == nil {
+		candidates = append(candidates, path)
+	}
+	seen := map[string]bool{}
 	for _, path := range candidates {
-		if path == "" {
+		key := strings.ToLower(path)
+		if path == "" || seen[key] {
 			continue
 		}
-		if info, err := os.Stat(path); err == nil && !info.IsDir() {
+		seen[key] = true
+		if info, err := os.Stat(path); err == nil && !info.IsDir() && isGitBash(path) {
 			return path, nil
 		}
 	}
 	return "", errors.New("Git Bash is required; install Git for Windows from https://git-scm.com/download/win")
+}
+
+func isGitBash(path string) bool {
+	output, err := exec.Command(path, "-lc", `printf '%s' "$(uname -s)"; command -v cygpath >/dev/null`).CombinedOutput()
+	return err == nil && strings.HasPrefix(strings.ToUpper(strings.TrimSpace(string(output))), "MINGW")
 }
 
 func addVSCodeToPath() error {
