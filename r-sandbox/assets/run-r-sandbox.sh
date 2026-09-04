@@ -21,6 +21,23 @@ native_exec() {
   if (( windows_git_bash )); then MSYS2_ARG_CONV_EXCL='*' "$@"; else "$@"; fi
 }
 
+ensure_sbx_daemon() {
+  [[ "$(uname -s 2>/dev/null || true)" == "Darwin" ]] || return 0
+  native_exec sbx daemon status >/dev/null 2>&1 && return 0
+  echo "Starting the Docker Sandboxes daemon in the background..."
+  native_exec sbx daemon start --detach || {
+    echo "Error: could not start the Docker Sandboxes daemon." >&2
+    return 1
+  }
+  local attempt
+  for attempt in {1..15}; do
+    native_exec sbx daemon status >/dev/null 2>&1 && return 0
+    sleep 1
+  done
+  echo "Error: the Docker Sandboxes daemon did not become ready within 15 seconds." >&2
+  return 1
+}
+
 project_name="$(basename -- "$project_root" | tr '[:upper:]_' '[:lower:]-' | tr -cd 'a-z0-9.-' | sed -E 's/^[.-]+//; s/[.-]+$//' | cut -c 1-32)"
 project_name="${project_name:-project}"
 workspace_key="$project_root"
@@ -45,6 +62,7 @@ if [[ ! "$sbx_version" =~ (Client[[:space:]]Version:|sbx[[:space:]]version:)[[:s
   echo "Error: Docker Sandboxes 0.39.0 or newer is required. Detected: $sbx_version" >&2
   exit 1
 fi
+ensure_sbx_daemon
 native_exec sbx setup ssh
 if (( ! windows_git_bash )); then
   native_exec sbx diagnose || { echo "Error: Docker Sandboxes diagnostics failed after SSH setup. Confirm virtualization and authentication." >&2; exit 1; }

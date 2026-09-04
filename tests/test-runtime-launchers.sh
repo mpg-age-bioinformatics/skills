@@ -97,10 +97,8 @@ run_case() {
     grep -F 'sbx|| setup ssh' "$log" >/dev/null
     grep -F 'sbx|| diagnose' "$log" >/dev/null
     grep -F 'code|| --remote' "$log" | grep -F "$container_project_log" >/dev/null
-    if [[ "$sandbox" == python ]]; then
-      grep -F 'sbx|| daemon start --detach' "$log" >/dev/null
-      [[ -f "$daemon_state" ]]
-    fi
+    grep -F 'sbx|| daemon start --detach' "$log" >/dev/null
+    [[ -f "$daemon_state" ]]
   fi
 }
 
