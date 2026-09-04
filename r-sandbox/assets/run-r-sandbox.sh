@@ -45,7 +45,8 @@ if [[ ! "$sbx_version" =~ (Client[[:space:]]Version:|sbx[[:space:]]version:)[[:s
   echo "Error: Docker Sandboxes 0.39.0 or newer is required. Detected: $sbx_version" >&2
   exit 1
 fi
-native_exec sbx diagnose || { echo "Error: Docker Sandboxes diagnostics failed. Confirm virtualization and authentication." >&2; exit 1; }
+native_exec sbx setup ssh
+native_exec sbx diagnose || { echo "Error: Docker Sandboxes diagnostics failed after SSH setup. Confirm virtualization and authentication." >&2; exit 1; }
 docker_os="$(native_exec docker info --format '{{.OSType}}' 2>/dev/null)" || { echo "Error: the Docker daemon is unavailable. Start Docker Desktop and retry." >&2; exit 1; }
 [[ "$(printf '%s' "$docker_os" | tr '[:upper:]' '[:lower:]')" == "linux" ]] || { echo "Error: Docker must be running Linux containers; detected: $docker_os" >&2; exit 1; }
 
@@ -105,7 +106,6 @@ else
   fi
 fi
 
-native_exec sbx setup ssh
 native_exec "$code_cli" --install-extension ms-vscode-remote.remote-ssh --force
 remote_authority="ssh-remote+${sandbox_name}.sbx"
 required_extensions=(REditorSupport.r RDebugger.r-debugger quarto.quarto openai.chatgpt anthropic.claude-code)
