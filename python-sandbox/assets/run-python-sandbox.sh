@@ -96,7 +96,14 @@ native_exec sbx exec --env "EXPECTED_PYTHON_SERIES=$python_series" --workdir "$s
    # Project directories are bind-mounted from the host. On Windows, Linux
    # symlinks created by venv on NTFS can appear executable but fail with
    # ENOENT, so install real interpreter copies on every platform.
-   .venv/bin/python -c "" >/dev/null 2>&1 || python -m venv --clear --copies .venv
+   if ! .venv/bin/python -c "" >/dev/null 2>&1; then
+     python -m venv --clear --copies --without-pip .venv
+     if ! .venv/bin/python -m ensurepip --upgrade --default-pip; then
+       # On Windows bind mounts ensurepip can report failure after pip was
+       # installed successfully. Continue only when pip proves usable.
+       .venv/bin/python -m pip --version
+     fi
+   fi
    test -x .venv/bin/python
    .venv/bin/python -c "import os, sys; expected = tuple(map(int, os.environ[\"EXPECTED_PYTHON_SERIES\"].split(\".\"))); assert sys.version_info[:2] == expected, (sys.version, expected); print(sys.executable); print(sys.version)"'
 

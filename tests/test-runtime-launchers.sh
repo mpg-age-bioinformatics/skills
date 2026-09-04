@@ -95,7 +95,8 @@ for sandbox in python r bioinformatics; do
   run_case "$sandbox" windows
 done
 
-grep -F 'python -m venv --clear --copies .venv' "$repository_root/python-sandbox/assets/run-python-sandbox.sh" >/dev/null
+grep -F 'python -m venv --clear --copies --without-pip .venv' "$repository_root/python-sandbox/assets/run-python-sandbox.sh" >/dev/null
+grep -F '.venv/bin/python -m pip --version' "$repository_root/python-sandbox/assets/run-python-sandbox.sh" >/dev/null
 grep -F 'ENV LD_LIBRARY_PATH="/opt/python/lib"' "$repository_root/python-sandbox/assets/Dockerfile.template" >/dev/null
 grep -F 'if [[ "$use_local_skill" != "1" || ! -x "$setup_script" ]]' "$repository_root/python-sandbox/assets/python-sandox.sh" >/dev/null
 grep -F 'PYTHON_SANDBOX_USE_LOCAL_SKILL=1 "$launcher"' "$repository_root/python-sandbox/assets/Python Sandbox.command" >/dev/null
