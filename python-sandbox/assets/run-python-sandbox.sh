@@ -93,7 +93,10 @@ native_exec sbx exec --env "EXPECTED_PYTHON_SERIES=$python_series" --workdir "$s
      echo "Error: .venv was created for Windows and cannot be used inside the Linux sandbox. Rename or remove .venv, then rerun the launcher." >&2
      exit 1
    fi
-   test -x .venv/bin/python || python -m venv .venv
+   # Project directories are bind-mounted from the host. On Windows, Linux
+   # symlinks created by venv on NTFS can appear executable but fail with
+   # ENOENT, so install real interpreter copies on every platform.
+   .venv/bin/python -c "" >/dev/null 2>&1 || python -m venv --clear --copies .venv
    test -x .venv/bin/python
    .venv/bin/python -c "import os, sys; expected = tuple(map(int, os.environ[\"EXPECTED_PYTHON_SERIES\"].split(\".\"))); assert sys.version_info[:2] == expected, (sys.version, expected); print(sys.executable); print(sys.version)"'
 

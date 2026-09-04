@@ -95,4 +95,6 @@ for sandbox in python r bioinformatics; do
   run_case "$sandbox" windows
 done
 
+grep -F 'python -m venv --clear --copies .venv' "$repository_root/python-sandbox/assets/run-python-sandbox.sh" >/dev/null
+
 echo "Runtime launcher path tests passed."
