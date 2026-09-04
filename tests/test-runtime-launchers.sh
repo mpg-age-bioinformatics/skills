@@ -12,10 +12,21 @@ cat > "$mock_bin/mock-tool" <<'MOCK'
 #!/usr/bin/env bash
 set -euo pipefail
 tool="$(basename -- "$0")"
+{
+  printf '%s|%s|' "$tool" "${MSYS2_ARG_CONV_EXCL:-}"
+  printf ' %q' "$@"
+  printf '\n'
+} >> "$SANDBOX_TEST_LOG"
 case "$tool:$1" in
   docker:info) echo linux; exit 0 ;;
   sbx:version) echo 'sbx version: v0.39.0 test'; exit 0 ;;
   sbx:ls) exit 0 ;;
+  sbx:daemon)
+    case "${2:-}" in
+      status) [[ -f "$SANDBOX_TEST_DAEMON_STATE" ]]; exit ;;
+      start) : > "$SANDBOX_TEST_DAEMON_STATE"; exit 0 ;;
+    esac
+    ;;
   sbx:exec)
     if [[ " $* " == *" pwd -P "* ]]; then
       printf '%s\n' "$SANDBOX_TEST_CONTAINER_PROJECT"
@@ -36,11 +47,6 @@ case "$tool:$1" in
   cygpath:-w) printf 'C:\\mock%s\n' "$2"; exit 0 ;;
   cygpath:-m) printf 'C:/mock%s\n' "$2"; exit 0 ;;
 esac
-{
-  printf '%s|%s|' "$tool" "${MSYS2_ARG_CONV_EXCL:-}"
-  printf ' %q' "$@"
-  printf '\n'
-} >> "$SANDBOX_TEST_LOG"
 MOCK
 chmod +x "$mock_bin/mock-tool"
 for tool in docker sbx code cygpath; do ln -s mock-tool "$mock_bin/$tool"; done
@@ -69,12 +75,13 @@ run_case() {
   cp "$runtime" "$project/code/$(basename -- "$runtime")"
   chmod +x "$project/code/$(basename -- "$runtime")"
   local log="$test_root/$sandbox-$mode.log"
+  local daemon_state="$test_root/$sandbox-$mode.daemon"
   local container_project='/sandbox/project\_5'
   local container_project_log
   printf -v container_project_log '%q' "$container_project"
   : > "$log"
   if [[ "$mode" == windows ]]; then
-    env PATH="$mock_bin:$PATH" OSTYPE=msys MSYSTEM=MINGW64 SANDBOX_TEST_LOG="$log" SANDBOX_TEST_CONTAINER_PROJECT="$container_project" "$skip_variable=0" \
+    env PATH="$mock_bin:$PATH" OSTYPE=msys MSYSTEM=MINGW64 SANDBOX_TEST_LOG="$log" SANDBOX_TEST_DAEMON_STATE="$daemon_state" SANDBOX_TEST_CONTAINER_PROJECT="$container_project" "$skip_variable=0" \
       bash "$project/code/$(basename -- "$runtime")" codex >/dev/null
     grep -F 'sbx|*| run' "$log" | grep -F 'C:\\mock/' >/dev/null
     grep -F 'sbx|*| setup ssh' "$log" >/dev/null
@@ -84,12 +91,16 @@ run_case() {
     fi
     grep -F 'code|*| --remote' "$log" | grep -F "$container_project_log" >/dev/null
   else
-    env PATH="$mock_bin:$PATH" OSTYPE=darwin SANDBOX_TEST_LOG="$log" SANDBOX_TEST_CONTAINER_PROJECT="$container_project" "$skip_variable=0" \
+    env PATH="$mock_bin:$PATH" OSTYPE=darwin SANDBOX_TEST_LOG="$log" SANDBOX_TEST_DAEMON_STATE="$daemon_state" SANDBOX_TEST_CONTAINER_PROJECT="$container_project" "$skip_variable=0" \
       bash "$project/code/$(basename -- "$runtime")" codex >/dev/null
     grep -F 'sbx|| run' "$log" | grep -F "$project" >/dev/null
     grep -F 'sbx|| setup ssh' "$log" >/dev/null
     grep -F 'sbx|| diagnose' "$log" >/dev/null
     grep -F 'code|| --remote' "$log" | grep -F "$container_project_log" >/dev/null
+    if [[ "$sandbox" == python ]]; then
+      grep -F 'sbx|| daemon start --detach' "$log" >/dev/null
+      [[ -f "$daemon_state" ]]
+    fi
   fi
 }
 
