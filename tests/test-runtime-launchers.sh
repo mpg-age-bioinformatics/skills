@@ -15,7 +15,6 @@ tool="$(basename -- "$0")"
 case "$tool:$1" in
   docker:info) echo linux; exit 0 ;;
   sbx:version) echo 'sbx version: v0.39.0 test'; exit 0 ;;
-  sbx:diagnose) exit 0 ;;
   sbx:ls) exit 0 ;;
   sbx:exec)
     if [[ " $* " == *" pwd -P "* ]]; then
@@ -78,6 +77,8 @@ run_case() {
     env PATH="$mock_bin:$PATH" OSTYPE=msys MSYSTEM=MINGW64 SANDBOX_TEST_LOG="$log" SANDBOX_TEST_CONTAINER_PROJECT="$container_project" "$skip_variable=0" \
       bash "$project/code/$(basename -- "$runtime")" codex >/dev/null
     grep -F 'sbx|*| run' "$log" | grep -F 'C:\\mock/' >/dev/null
+    grep -F 'sbx|*| setup ssh' "$log" >/dev/null
+    ! grep -F 'sbx|*| diagnose' "$log" >/dev/null
     if [[ "$sandbox" != bioinformatics ]]; then
       grep -F 'sbx|*| exec' "$log" | grep -F -- "--workdir $container_project_log" >/dev/null
     fi
@@ -86,6 +87,8 @@ run_case() {
     env PATH="$mock_bin:$PATH" OSTYPE=darwin SANDBOX_TEST_LOG="$log" SANDBOX_TEST_CONTAINER_PROJECT="$container_project" "$skip_variable=0" \
       bash "$project/code/$(basename -- "$runtime")" codex >/dev/null
     grep -F 'sbx|| run' "$log" | grep -F "$project" >/dev/null
+    grep -F 'sbx|| setup ssh' "$log" >/dev/null
+    grep -F 'sbx|| diagnose' "$log" >/dev/null
     grep -F 'code|| --remote' "$log" | grep -F "$container_project_log" >/dev/null
   fi
 }
