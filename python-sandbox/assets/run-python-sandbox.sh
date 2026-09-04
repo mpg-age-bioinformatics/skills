@@ -82,8 +82,20 @@ fi
 
 python_series="$(sed -n 's/^ARG PYTHON_IMAGE=python:\([0-9][0-9]*\.[0-9][0-9]*\)-bookworm$/\1/p' "$project_root/code/Dockerfile")"
 [[ -n "$python_series" ]] || { echo "Error: could not determine the Python series from code/Dockerfile." >&2; exit 1; }
-native_exec sbx exec --env "EXPECTED_PYTHON_SERIES=$python_series" --workdir "$project_root" "$sandbox_name" sh -c \
-  'set -e; test -x .venv/bin/python || python -m venv .venv; test -x .venv/bin/python; .venv/bin/python -c "import os, sys; expected = tuple(map(int, os.environ[\"EXPECTED_PYTHON_SERIES\"].split(\".\"))); assert sys.version_info[:2] == expected, (sys.version, expected); print(sys.executable); print(sys.version)"'
+sandbox_project_root="$(native_exec sbx exec "$sandbox_name" sh -c 'pwd -P')"
+case "$sandbox_project_root" in
+  /*) ;;
+  *) echo "Error: could not determine the project path inside the sandbox: $sandbox_project_root" >&2; exit 1 ;;
+esac
+native_exec sbx exec --env "EXPECTED_PYTHON_SERIES=$python_series" --workdir "$sandbox_project_root" "$sandbox_name" sh -c \
+  'set -e
+   if [ -e .venv/Scripts/python.exe ] && [ ! -x .venv/bin/python ]; then
+     echo "Error: .venv was created for Windows and cannot be used inside the Linux sandbox. Rename or remove .venv, then rerun the launcher." >&2
+     exit 1
+   fi
+   test -x .venv/bin/python || python -m venv .venv
+   test -x .venv/bin/python
+   .venv/bin/python -c "import os, sys; expected = tuple(map(int, os.environ[\"EXPECTED_PYTHON_SERIES\"].split(\".\"))); assert sys.version_info[:2] == expected, (sys.version, expected); print(sys.executable); print(sys.version)"'
 
 if [[ "${PYTHON_SANDBOX_SKIP_VSCODE:-0}" == "1" ]]; then
   echo "Skipped VS Code setup because PYTHON_SANDBOX_SKIP_VSCODE=1."
@@ -131,4 +143,4 @@ for extension in "${required_extensions[@]}"; do
     exit 1
   fi
 done
-native_exec "$code_cli" --remote "$remote_authority" "$project_root"
+native_exec "$code_cli" --remote "$remote_authority" "$sandbox_project_root"
