@@ -97,6 +97,35 @@ done
 
 grep -F 'python -m venv --clear --copies --without-pip .venv' "$repository_root/python-sandbox/assets/run-python-sandbox.sh" >/dev/null
 grep -F '.venv/bin/python -m pip --version' "$repository_root/python-sandbox/assets/run-python-sandbox.sh" >/dev/null
+PYTHONPYCACHEPREFIX="$test_root/pycache" python3 -m py_compile "$repository_root/python-sandbox/assets/windows-venv-sitecustomize.py"
+python3 - "$repository_root/python-sandbox/assets/windows-venv-sitecustomize.py" "$test_root/test-venv" <<'PY'
+import errno
+import os
+import runpy
+import sys
+
+shim, venv = sys.argv[1:]
+original_chmod = os.chmod
+original_prefix = sys.prefix
+
+def reject_chmod(path, mode, **kwargs):
+    raise OSError(errno.EPERM, "simulated Windows bind-mount limitation", path)
+
+try:
+    sys.prefix = venv
+    os.chmod = reject_chmod
+    runpy.run_path(shim)
+    os.chmod(os.path.join(venv, "bin", "tool"), 0o755)
+    try:
+        os.chmod(os.path.dirname(venv), 0o755)
+    except OSError as error:
+        assert error.errno == errno.EPERM
+    else:
+        raise AssertionError("EPERM outside the venv was incorrectly ignored")
+finally:
+    os.chmod = original_chmod
+    sys.prefix = original_prefix
+PY
 grep -F 'ENV LD_LIBRARY_PATH="/opt/python/lib"' "$repository_root/python-sandbox/assets/Dockerfile.template" >/dev/null
 grep -F 'if [[ "$use_local_skill" != "1" || ! -x "$setup_script" ]]' "$repository_root/python-sandbox/assets/python-sandox.sh" >/dev/null
 grep -F 'PYTHON_SANDBOX_USE_LOCAL_SKILL=1 "$launcher"' "$repository_root/python-sandbox/assets/Python Sandbox.command" >/dev/null

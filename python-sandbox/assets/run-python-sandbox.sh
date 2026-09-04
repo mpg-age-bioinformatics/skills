@@ -96,12 +96,22 @@ native_exec sbx exec --env "EXPECTED_PYTHON_SERIES=$python_series" --workdir "$s
    # Project directories are bind-mounted from the host. On Windows, Linux
    # symlinks created by venv on NTFS can appear executable but fail with
    # ENOENT, so install real interpreter copies on every platform.
+   venv_created=0
    if ! .venv/bin/python -c "" >/dev/null 2>&1; then
      python -m venv --clear --copies --without-pip .venv
-     if ! .venv/bin/python -m ensurepip --upgrade --default-pip; then
-       # On Windows bind mounts ensurepip can report failure after pip was
-       # installed successfully. Continue only when pip proves usable.
-       .venv/bin/python -m pip --version
+     venv_created=1
+   fi
+   venv_site_packages="$(.venv/bin/python -c "import sysconfig; print(sysconfig.get_path(\"purelib\"))")"
+   cp code/windows-venv-sitecustomize.py "$venv_site_packages/sitecustomize.py"
+   if [ "$venv_created" = 1 ]; then
+     if ! ensurepip_output="$(.venv/bin/python -m ensurepip --upgrade --default-pip 2>&1)"; then
+       if ! .venv/bin/python -m pip --version >/dev/null 2>&1; then
+         printf "%s\n" "$ensurepip_output" >&2
+         exit 1
+       fi
+       echo "Warning: ensurepip reported a Windows mount permission limitation after pip was installed; continuing with verified pip."
+     else
+       printf "%s\n" "$ensurepip_output"
      fi
    fi
    test -x .venv/bin/python
