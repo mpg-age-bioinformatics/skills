@@ -17,6 +17,12 @@ case "$tool:$1" in
   sbx:version) echo 'sbx version: v0.39.0 test'; exit 0 ;;
   sbx:diagnose) exit 0 ;;
   sbx:ls) exit 0 ;;
+  sbx:exec)
+    if [[ " $* " == *" pwd -P "* ]]; then
+      printf '%s\n' "$SANDBOX_TEST_CONTAINER_PROJECT"
+      exit 0
+    fi
+    ;;
   code:--remote)
     for argument in "$@"; do
       if [[ "$argument" == "--list-extensions" ]]; then
@@ -64,20 +70,23 @@ run_case() {
   cp "$runtime" "$project/code/$(basename -- "$runtime")"
   chmod +x "$project/code/$(basename -- "$runtime")"
   local log="$test_root/$sandbox-$mode.log"
+  local container_project='/sandbox/project\_5'
+  local container_project_log
+  printf -v container_project_log '%q' "$container_project"
   : > "$log"
   if [[ "$mode" == windows ]]; then
-    env PATH="$mock_bin:$PATH" OSTYPE=msys MSYSTEM=MINGW64 SANDBOX_TEST_LOG="$log" "$skip_variable=0" \
+    env PATH="$mock_bin:$PATH" OSTYPE=msys MSYSTEM=MINGW64 SANDBOX_TEST_LOG="$log" SANDBOX_TEST_CONTAINER_PROJECT="$container_project" "$skip_variable=0" \
       bash "$project/code/$(basename -- "$runtime")" codex >/dev/null
     grep -F 'sbx|*| run' "$log" | grep -F 'C:\\mock/' >/dev/null
     if [[ "$sandbox" != bioinformatics ]]; then
-      grep -F 'sbx|*| exec' "$log" | grep -F -- "--workdir $project" >/dev/null
+      grep -F 'sbx|*| exec' "$log" | grep -F -- "--workdir $container_project_log" >/dev/null
     fi
-    grep -F 'code|*| --remote' "$log" | grep -F "$project" >/dev/null
+    grep -F 'code|*| --remote' "$log" | grep -F "$container_project_log" >/dev/null
   else
-    env PATH="$mock_bin:$PATH" OSTYPE=darwin SANDBOX_TEST_LOG="$log" "$skip_variable=0" \
+    env PATH="$mock_bin:$PATH" OSTYPE=darwin SANDBOX_TEST_LOG="$log" SANDBOX_TEST_CONTAINER_PROJECT="$container_project" "$skip_variable=0" \
       bash "$project/code/$(basename -- "$runtime")" codex >/dev/null
     grep -F 'sbx|| run' "$log" | grep -F "$project" >/dev/null
-    grep -F 'code|| --remote' "$log" | grep -F "$project" >/dev/null
+    grep -F 'code|| --remote' "$log" | grep -F "$container_project_log" >/dev/null
   fi
 }
 

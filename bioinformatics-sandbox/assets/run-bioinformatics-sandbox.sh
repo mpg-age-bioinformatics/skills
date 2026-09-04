@@ -59,6 +59,12 @@ else
   native_exec sbx run --detached --name "$sandbox_name" "$agent" "$(host_path "$project_root")"
 fi
 
+sandbox_project_root="$(native_exec sbx exec "$sandbox_name" sh -c 'pwd -P')"
+case "$sandbox_project_root" in
+  /*) ;;
+  *) echo "Error: could not determine the project path inside the sandbox: $sandbox_project_root" >&2; exit 1 ;;
+esac
+
 if [[ "${BIOINFORMATICS_SANDBOX_SKIP_VSCODE:-0}" == "1" ]]; then
   echo "Skipped VS Code setup because BIOINFORMATICS_SANDBOX_SKIP_VSCODE=1."
   exit 0
@@ -105,4 +111,4 @@ for extension in "${required_extensions[@]}"; do
     exit 1
   fi
 done
-native_exec "$code_cli" --remote "$remote_authority" "$project_root"
+native_exec "$code_cli" --remote "$remote_authority" "$sandbox_project_root"

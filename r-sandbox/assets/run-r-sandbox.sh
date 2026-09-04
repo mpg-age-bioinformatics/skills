@@ -62,7 +62,9 @@ native_exec sbx template load "$(host_path "$template_tar")"
 echo "Sandbox: $sandbox_name"
 echo "VS Code Remote-SSH host: ${sandbox_name}.sbx"
 echo "Workspace: $project_root"
-r_library="$project_root/.r-library"
+# Keep the agent-session value relative to its sandbox workspace. The absolute
+# host path can differ from the actual mount path on Windows.
+r_library=".r-library"
 
 if native_exec sbx ls --quiet | grep -Fqx "$sandbox_name"; then
   native_exec sbx run --detached --env "R_LIBS_USER=$r_library" --name "$sandbox_name"
@@ -72,7 +74,13 @@ fi
 
 r_series="$(sed -n 's/^ARG R_IMAGE=ghcr.io\/rocker-org\/devcontainer\/r-ver:\([0-9][0-9]*\.[0-9][0-9]*\)$/\1/p' "$project_root/code/Dockerfile")"
 [[ -n "$r_series" ]] || { echo "Error: could not determine the R series from code/Dockerfile." >&2; exit 1; }
-native_exec sbx exec --env "EXPECTED_R_SERIES=$r_series" --env "R_LIBS_USER=$r_library" --workdir "$project_root" "$sandbox_name" Rscript -e \
+sandbox_project_root="$(native_exec sbx exec "$sandbox_name" sh -c 'pwd -P')"
+case "$sandbox_project_root" in
+  /*) ;;
+  *) echo "Error: could not determine the project path inside the sandbox: $sandbox_project_root" >&2; exit 1 ;;
+esac
+sandbox_r_library="$sandbox_project_root/.r-library"
+native_exec sbx exec --env "EXPECTED_R_SERIES=$r_series" --env "R_LIBS_USER=$sandbox_r_library" --workdir "$sandbox_project_root" "$sandbox_name" Rscript -e \
   'actual <- paste(R.version$major, strsplit(R.version$minor, ".", fixed=TRUE)[[1]][1], sep="."); stopifnot(identical(actual, Sys.getenv("EXPECTED_R_SERIES")), normalizePath(Sys.getenv("R_LIBS_USER"), mustWork=TRUE) %in% normalizePath(.libPaths(), mustWork=FALSE), requireNamespace("BiocManager", quietly=TRUE), requireNamespace("languageserver", quietly=TRUE), as.character(utils::packageVersion("languageserver")) == "0.3.18"); cat(R.version.string, "\n"); cat("BiocManager", as.character(utils::packageVersion("BiocManager")), "\n"); cat("languageserver", as.character(utils::packageVersion("languageserver")), "\n"); cat(.libPaths(), sep="\n")'
 
 if [[ "${R_SANDBOX_SKIP_VSCODE:-0}" == "1" ]]; then
@@ -114,4 +122,4 @@ for extension in "${required_extensions[@]}"; do
   fi
 done
 
-native_exec "$code_cli" --remote "$remote_authority" "$project_root"
+native_exec "$code_cli" --remote "$remote_authority" "$sandbox_project_root"
