@@ -6,6 +6,7 @@ agent="${2:-}"
 project_dir="${3:-}"
 skills_repository="${PYTHON_SANDBOX_SKILLS_REPOSITORY:-https://github.com/mpg-age-bioinformatics/skills.git}"
 skills_ref="${PYTHON_SANDBOX_SKILLS_REF:-}"
+use_local_skill="${PYTHON_SANDBOX_USE_LOCAL_SKILL:-0}"
 download_root=""
 
 cleanup() {
@@ -78,7 +79,7 @@ asset_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 skill_dir="$(dirname -- "$asset_dir")"
 setup_script="$skill_dir/scripts/setup-project.sh"
 
-if [[ ! -x "$setup_script" ]]; then
+if [[ "$use_local_skill" != "1" || ! -x "$setup_script" ]]; then
   command -v git >/dev/null 2>&1 || {
     echo "Error: Git is required to download the Python Sandbox setup files." >&2
     exit 1

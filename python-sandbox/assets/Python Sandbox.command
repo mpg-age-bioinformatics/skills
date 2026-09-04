@@ -28,24 +28,19 @@ finish() {
 }
 trap finish EXIT
 
-asset_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-launcher="$asset_dir/python-sandox.sh"
-
-if [[ ! -x "$launcher" ]]; then
-  command -v git >/dev/null 2>&1 || {
-    echo "Error: Git is required to download the Python Sandbox setup files." >&2
-    exit 1
-  }
-  download_root="$(mktemp -d "${temporary_root%/}/python-sandbox-command.XXXXXX")"
-  downloaded_skills="$download_root/skills"
-  echo "Downloading Python Sandbox setup files..."
-  git clone --quiet --depth 1 "$skills_repository" "$downloaded_skills"
-  if [[ -n "$skills_ref" ]]; then
-    git -C "$downloaded_skills" fetch --quiet --depth 1 origin "$skills_ref"
-    git -C "$downloaded_skills" checkout --quiet --detach FETCH_HEAD
-  fi
-  launcher="$downloaded_skills/python-sandbox/assets/python-sandox.sh"
+command -v git >/dev/null 2>&1 || {
+  echo "Error: Git is required to download the Python Sandbox setup files." >&2
+  exit 1
+}
+download_root="$(mktemp -d "${temporary_root%/}/python-sandbox-command.XXXXXX")"
+downloaded_skills="$download_root/skills"
+echo "Downloading Python Sandbox setup files..."
+git clone --quiet --depth 1 "$skills_repository" "$downloaded_skills"
+if [[ -n "$skills_ref" ]]; then
+  git -C "$downloaded_skills" fetch --quiet --depth 1 origin "$skills_ref"
+  git -C "$downloaded_skills" checkout --quiet --detach FETCH_HEAD
 fi
+launcher="$downloaded_skills/python-sandbox/assets/python-sandox.sh"
 
 [[ -x "$launcher" ]] || {
   echo "Error: downloaded Python Sandbox launcher is unavailable: $launcher" >&2
@@ -75,4 +70,4 @@ if [[ -z "$project_dir" ]]; then
   fi
 fi
 
-"$launcher" "$python_version" "$agent" "$project_dir"
+PYTHON_SANDBOX_USE_LOCAL_SKILL=1 "$launcher" "$python_version" "$agent" "$project_dir"
