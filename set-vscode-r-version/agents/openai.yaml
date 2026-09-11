@@ -1,0 +1,7 @@
+interface:
+  display_name: "Set VS Code R Version"
+  short_description: "Set R version and VS Code R setup."
+  default_prompt: "Use $set-vscode-r-version to set this folder to R_VERSION 4.5.2."
+
+policy:
+  allow_implicit_invocation: true
